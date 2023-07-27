@@ -3,12 +3,18 @@ package org.eventio
 import io.nayuki.qrcodegen.QrCode
 import io.smallrye.mutiny.Uni
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
+import org.jboss.logging.Logger
 import java.awt.image.BufferedImage
-import java.lang.RuntimeException
 import java.util.*
 
 @ApplicationScoped
 class QRGeneratorService {
+
+    @Inject
+    lateinit var qrGenerator: QRGenerator
+
+    private val logger: Logger = Logger.getLogger(QRGeneratorService::class.java)
 
     private fun toImage(qr: QrCode, scale: Int, border: Int, lightColor: Int, darkColor: Int): BufferedImage? {
         Objects.requireNonNull(qr)
@@ -31,13 +37,12 @@ class QRGeneratorService {
         return Uni.createFrom().item(toImage(qr, scale, border, 0xFFFFFF, 0x000000));
     }
 
-    internal fun generateQRCode(text: String, scale: Int, border: Int) : Uni<ByteArray> {
-        return generateQRCodeImage(text, scale, border)
+    internal fun generateQRCode(text: String, scale: Int?, border: Int?) : Uni<ByteArray> {
+        return generateQRCodeImage(text, scale ?: qrGenerator.scale(), border ?: qrGenerator.border())
             ?.map { image ->
                 val baos = java.io.ByteArrayOutputStream()
                 javax.imageio.ImageIO.write(image, "png", baos)
                 baos.toByteArray()
             } ?: Uni.createFrom().failure(RuntimeException("Failed to generate QR code"));
     }
-
 }
