@@ -1,5 +1,6 @@
 package org.eventio
 
+import io.github.jan.supabase.storage.BucketItem
 import io.smallrye.mutiny.Uni
 import jakarta.inject.Inject
 import jakarta.ws.rs.*
@@ -13,24 +14,31 @@ class QRResource {
     @Inject
     lateinit var qrGeneratorService: QRGeneratorService
 
-    @GET
-    @Consumes(MediaType.TEXT_PLAIN)
-    @Produces("image/png")
-    fun qr(
-        @QueryParam("text") text: String,
-        @DefaultValue("5") @QueryParam("scale") scale: Int = 5,
-        @DefaultValue("2") @QueryParam("border") border: Int = 2,
-        @DefaultValue("") @QueryParam("meta") meta: String = "",
-    ): Uni<ByteArray> {
-        return qrGeneratorService.generateQRCode(text, scale, border);
-    }
+    @Inject
+    lateinit var supabaseClientService: SupabaseClientService
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces("image/png")
-    fun qr(
+    fun generate(
         qrRequest: QRRequest,
     ): Uni<ByteArray> {
-        return qrGeneratorService.generateQRCode(qrRequest.text, qrRequest.scale, qrRequest.border);
+        return qrGeneratorService
+            .generateQRCode(qrRequest.text, qrRequest.scale, qrRequest.border)
+            .onItem().call { byteArray ->
+                supabaseClientService.uploadQRCode(
+                    byteArray,
+                    qrRequest.meta.nget("directory", UUID.randomUUID()).toString(),
+                    qrRequest.meta.nget("name", UUID.randomUUID()).toString()
+                )
+            }
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    fun list(
+        @QueryParam("directory") directory: String,
+    ): Uni<List<BucketItem>> {
+        return supabaseClientService.getQRCodes(directory)
     }
 }
